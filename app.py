@@ -48,7 +48,7 @@ st.markdown("""
         border-left: 4px solid #00d4aa;
     }
 </style>
-"", unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # ----------------------------
 # Sidebar Controls
@@ -482,4 +482,4 @@ st.markdown("""
     <p>Built with Streamlit • Plotly • yFinance • Python</p>
     <p>Data sourced from Yahoo Finance | For educational purposes</p>
 </div>
-"", unsafe_allow_html=True)
+""", unsafe_allow_html=True)
