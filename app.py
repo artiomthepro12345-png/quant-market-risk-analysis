@@ -48,7 +48,7 @@ st.markdown("""
         border-left: 4px solid #00d4aa;
     }
 </style>
-""", unsafe_allow_html=True)
+"", unsafe_allow_html=True)
 
 # ----------------------------
 # Sidebar Controls
@@ -90,9 +90,39 @@ st.sidebar.markdown("Data: Yahoo Finance API")
 # ----------------------------
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_data(tickers, start, end):
-    data = yf.download(tickers, start=start, end=end)["Adj Close"]
+    """Download price data from yfinance, handling both old and new API formats."""
+    raw = yf.download(tickers, start=start, end=end)
+
+    # Handle MultiIndex columns (newer yfinance versions)
+    if isinstance(raw.columns, pd.MultiIndex):
+        # Try "Adj Close" first, fall back to "Close"
+        if "Adj Close" in raw.columns.get_level_values(0):
+            data = raw["Adj Close"]
+        elif "Close" in raw.columns.get_level_values(0):
+            data = raw["Close"]
+        else:
+            # Use whatever price column is available
+            price_col = raw.columns.get_level_values(0)[0]
+            data = raw[price_col]
+    else:
+        # Single ticker returns a simple DataFrame
+        if "Adj Close" in raw.columns:
+            data = raw[["Adj Close"]]
+            data.columns = [tickers[0]] if isinstance(tickers, list) else [tickers]
+        elif "Close" in raw.columns:
+            data = raw[["Close"]]
+            data.columns = [tickers[0]] if isinstance(tickers, list) else [tickers]
+        else:
+            data = raw
+
+    # Ensure we have a DataFrame (not a Series)
     if isinstance(data, pd.Series):
-        data = data.to_frame(name=tickers[0])
+        data = data.to_frame(name=tickers[0] if isinstance(tickers, list) else tickers)
+
+    # Flatten MultiIndex columns if still present
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(-1)
+
     return data
 
 # ----------------------------
@@ -113,6 +143,9 @@ with st.spinner("📡 Fetching market data..."):
 if data.empty:
     st.error("❌ No data returned. Check your asset symbols and date range.")
     st.stop()
+
+# Drop any columns or rows that are entirely NaN
+data = data.dropna(how="all", axis=1).dropna(how="all", axis=0)
 
 returns = data.pct_change().dropna()
 
@@ -329,7 +362,7 @@ with tab4:
         results[1, i] = port_vol
         results[2, i] = port_sharpe
 
-        if i % (num_simulations // 20) == 0:
+        if i % max(1, num_simulations // 20) == 0:
             progress_bar.progress(i / num_simulations)
 
     progress_bar.progress(1.0)
@@ -449,4 +482,4 @@ st.markdown("""
     <p>Built with Streamlit • Plotly • yFinance • Python</p>
     <p>Data sourced from Yahoo Finance | For educational purposes</p>
 </div>
-""", unsafe_allow_html=True)
+"", unsafe_allow_html=True)
